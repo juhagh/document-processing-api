@@ -1,0 +1,13 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/DocumentProcessing.Api/DocumentProcessing.Api.csproj" />
+    <Project Path="src/DocumentProcessing.Application/DocumentProcessing.Application.csproj" />
+    <Project Path="src/DocumentProcessing.Domain/DocumentProcessing.Domain.csproj" />
+    <Project Path="src/DocumentProcessing.Infrastructure/DocumentProcessing.Infrastructure.csproj" />
+    <Project Path="src/DocumentProcessing.Worker/DocumentProcessing.Worker.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/DocumentProcessing.Api.Tests/DocumentProcessing.Api.Tests.csproj" />
+    <Project Path="tests/DocumentProcessing.Domain.Tests/DocumentProcessing.Domain.Tests.csproj" />
+  </Folder>
+</Solution>
