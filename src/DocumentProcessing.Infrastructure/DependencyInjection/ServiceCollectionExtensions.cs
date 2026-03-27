@@ -1,4 +1,6 @@
+using DocumentProcessing.Application.Interfaces;
 using DocumentProcessing.Infrastructure.Persistence;
+using DocumentProcessing.Infrastructure.Repositories;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -16,6 +18,8 @@ public static class ServiceCollectionExtensions
 
         services.AddDbContext<DocumentProcessingDbContext>(options =>
             options.UseNpgsql(connectionString));
+
+        services.AddScoped<IJobRepository, JobRepository>();
 
         return services;
     }

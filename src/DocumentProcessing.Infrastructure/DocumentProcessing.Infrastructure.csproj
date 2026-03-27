@@ -16,7 +16,6 @@
 
   <ItemGroup>
     <Folder Include="Messaging\" />
-    <Folder Include="Repositories\" />
   </ItemGroup>
 
   <PropertyGroup>

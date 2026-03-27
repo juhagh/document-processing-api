@@ -1,6 +1,12 @@
-@DocumentProcessing.Api_HostAddress = http://localhost:5031
+@HostAddress = http://localhost:5031
 
-GET {{DocumentProcessing.Api_HostAddress}}/weatherforecast/
+GET {{HostAddress}}/api/jobs/3
 Accept: application/json
 
-###
+### Send POST request with json body
+POST http://{{HostAddress}}/api/jobs
+Content-Type: application/json
+
+{
+  "InputText": "Test Document 3"
+}
