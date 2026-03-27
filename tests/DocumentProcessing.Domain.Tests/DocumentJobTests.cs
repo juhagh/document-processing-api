@@ -122,7 +122,7 @@ public class DocumentJobTests
         var originalStatus = job.Status;
         var originalUpdatedAtUtc = job.UpdatedAtUtc;
         
-        Assert.Throws<ArgumentNullException>(() => job.MarkCompleted(null));
+        Assert.Throws<ArgumentNullException>(() => job.MarkCompleted(null!));
         Assert.Equal(originalStatus, job.Status);
         Assert.Equal(originalUpdatedAtUtc, job.UpdatedAtUtc);
     }
