@@ -33,6 +33,17 @@ public class JobService : IJobService
         return job is null ? null : MapToJobResponseDto(job);
     }
 
+    public async Task<IReadOnlyList<JobResponseDto>> GetAllAsync(CancellationToken cancellationToken = default)
+    {
+        var jobs = await _repository.GetAllAsync(cancellationToken);
+        var jobList = jobs
+            .Select(MapToJobResponseDto)
+            .ToList()
+            .AsReadOnly();
+
+        return jobList;
+    }
+
     private static JobResponseDto MapToJobResponseDto(DocumentJob job)
     {
         return new JobResponseDto

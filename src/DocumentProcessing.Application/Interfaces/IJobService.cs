@@ -6,4 +6,5 @@ public interface IJobService
 {
     Task<JobResponseDto> CreateAsync(CreateJobRequestDto request, CancellationToken cancellationToken = default);
     Task<JobResponseDto?> GetByIdAsync(int id, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<JobResponseDto>> GetAllAsync(CancellationToken cancellationToken = default);
 }

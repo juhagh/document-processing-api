@@ -16,6 +16,17 @@ public class JobsController : ControllerBase
         _jobService = jobService;
     }
     
+    [HttpGet]
+    public async Task<ActionResult<IReadOnlyList<JobResponse>>> GetAllJobs(CancellationToken cancellationToken)
+    {
+        var jobs = await _jobService.GetAllAsync(cancellationToken);
+        var jobList = jobs
+            .Select(MapToResponse)
+            .ToList();
+
+        return Ok(jobList);
+    }
+    
     [HttpGet("{id:int}")]
     public async Task<ActionResult<JobResponse>> GetJobById(int id, CancellationToken cancellationToken)
     {

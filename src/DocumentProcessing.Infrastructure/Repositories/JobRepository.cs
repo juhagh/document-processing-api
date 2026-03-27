@@ -27,4 +27,12 @@ public class JobRepository : IJobRepository
             .FirstOrDefaultAsync(j => j.Id == id, cancellationToken);
     }
 
+    public async Task<IReadOnlyList<DocumentJob>> GetAllAsync(CancellationToken cancellationToken = default)
+    {
+        return await _context.DocumentJobs
+            .AsNoTracking()
+            .OrderByDescending(j => j.SubmittedAtUtc)
+            .ToListAsync(cancellationToken);
+    }
+
 }

@@ -1,6 +1,11 @@
 @HostAddress = http://localhost:5031
 
-GET {{HostAddress}}/api/jobs/3
+### Send GET with ID to retrieve a particular job
+GET {{HostAddress}}/api/jobs/5
+Accept: application/json
+
+### Send GET to list all jobs
+GET {{HostAddress}}/api/jobs
 Accept: application/json
 
 ### Send POST request with json body
@@ -8,5 +13,5 @@ POST http://{{HostAddress}}/api/jobs
 Content-Type: application/json
 
 {
-  "InputText": "Test Document 3"
+  "InputText": "Test Document 5"
 }
