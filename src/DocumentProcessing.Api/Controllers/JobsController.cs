@@ -49,7 +49,8 @@ public class JobsController : ControllerBase
         
         var job = await _jobService.CreateAsync(dto, cancellationToken);
         
-        return CreatedAtAction(nameof(GetJobById), new { id = job.Id }, MapToResponse(job));
+        // return CreatedAtAction(nameof(GetJobById), new { id = job.Id }, MapToResponse(job));
+        return AcceptedAtAction(nameof(GetJobById), new { Id = job.Id }, MapToResponse(job));
 
     }
     

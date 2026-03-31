@@ -1,5 +1,6 @@
 using DocumentProcessing.Application.DTOs;
 using DocumentProcessing.Application.Interfaces;
+using DocumentProcessing.Application.Messaging;
 using DocumentProcessing.Domain.Entities;
 
 namespace DocumentProcessing.Application.Jobs;
@@ -8,10 +9,12 @@ public class JobService : IJobService
 {
     
     private readonly IJobRepository _repository;
+    private readonly IJobMessagePublisher _publisher;
 
-    public JobService(IJobRepository repository)
+    public JobService(IJobRepository repository, IJobMessagePublisher publisher)
     {
         _repository = repository;
+        _publisher = publisher;
     }
     
     public async Task<JobResponseDto> CreateAsync(CreateJobRequestDto request,
@@ -21,6 +24,16 @@ public class JobService : IJobService
         
         var job = DocumentJob.Create(request.InputText);
         await _repository.AddAsync(job, cancellationToken);
+        await _repository.SaveChangesAsync(cancellationToken);
+        
+        var message = new ProcessDocumentJobMessage
+        {
+            JobId = job.Id
+        };
+
+        await _publisher.PublishAsync(message, cancellationToken);
+        job.MarkQueued();
+        await _repository.SaveChangesAsync(cancellationToken);
         
         return MapToJobResponseDto(job);
         

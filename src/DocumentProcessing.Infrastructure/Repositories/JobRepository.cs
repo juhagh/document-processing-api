@@ -17,7 +17,7 @@ public class JobRepository : IJobRepository
     public async Task AddAsync(DocumentJob job, CancellationToken cancellationToken = default)
     {
         await _context.DocumentJobs.AddAsync(job, cancellationToken);
-        await _context.SaveChangesAsync(cancellationToken);
+        // await _context.SaveChangesAsync(cancellationToken);
     }
 
     public async Task<DocumentJob?> GetByIdAsync(int id, CancellationToken cancellationToken = default)
@@ -33,6 +33,17 @@ public class JobRepository : IJobRepository
             .AsNoTracking()
             .OrderByDescending(j => j.SubmittedAtUtc)
             .ToListAsync(cancellationToken);
+    }
+
+    public async Task<DocumentJob?> GetTrackedByIdAsync(int id, CancellationToken cancellationToken = default)
+    {
+        return await _context.DocumentJobs
+            .FirstOrDefaultAsync(j => j.Id == id, cancellationToken);
+    }
+
+    public async Task SaveChangesAsync(CancellationToken cancellationToken = default)
+    {
+        await _context.SaveChangesAsync(cancellationToken);
     }
 
 }

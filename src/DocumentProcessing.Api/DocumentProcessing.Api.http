@@ -13,5 +13,5 @@ POST http://{{HostAddress}}/api/jobs
 Content-Type: application/json
 
 {
-  "InputText": "Test Document 5"
+  "InputText": "Test Document 10"
 }
