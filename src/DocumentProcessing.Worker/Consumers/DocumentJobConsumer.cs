@@ -64,7 +64,6 @@ public class DocumentJobConsumer : BackgroundService
         BasicDeliverEventArgs ea,
         CancellationToken cancellationToken)
     {
-        // deserialize
         var body = ea.Body.ToArray();
         var message = JsonSerializer.Deserialize<ProcessDocumentJobMessage>(body);
         
@@ -76,11 +75,9 @@ public class DocumentJobConsumer : BackgroundService
         }
         
         _logger.LogInformation("Received job message for job {JobId}.", message.JobId);
-
-        // create scope
+        
         await using var scope = _serviceScopeFactory.CreateAsyncScope();
         
-        // resolve repository
         var repo = scope.ServiceProvider.GetRequiredService<IJobRepository>();
         
         DocumentJob? job = null;
@@ -107,19 +104,13 @@ public class DocumentJobConsumer : BackgroundService
                 return;
             }
             
-            // mark processing
             job.MarkProcessing();
             await repo.SaveChangesAsync(cancellationToken);
 
-            // analyze
             var result = Analyze(job.InputText);
             
-            // mark completed/failed
-            // if success
             job.MarkCompleted(result);
-            
-            // Tell RabbitMQ the message was handled successfully
-            
+
             await repo.SaveChangesAsync(cancellationToken);
             await channel.BasicAckAsync(ea.DeliveryTag, multiple: false, cancellationToken: cancellationToken);
             

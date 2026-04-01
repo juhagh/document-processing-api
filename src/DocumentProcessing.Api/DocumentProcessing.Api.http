@@ -1,7 +1,7 @@
 @HostAddress = http://localhost:5031
 
 ### Send GET with ID to retrieve a particular job
-GET {{HostAddress}}/api/jobs/14
+GET {{HostAddress}}/api/jobs/25
 Accept: application/json
 
 ### Send GET to list all jobs
@@ -21,5 +21,28 @@ POST http://{{HostAddress}}/api/jobs
 Content-Type: application/json
 
 {
-  "InputText": "This is a slightly more complex test document.\nIt contains multiple lines, some punctuation, and a few longer words.\nThe goal is to verify that analysis logic correctly counts words, characters, and lines.\n"
+  "InputText": "This is a slightly more complex test document.\nIt contains multiple lines, some punctuation, and a few longer words.\nThe goal is to verify that analysis logic correctly counts words, characters, and lines."
+}
+
+### Create Job and capture id
+POST http://{{HostAddress}}/api/jobs
+Content-Type: application/json
+
+{
+  "InputText": "Test {{$random.uuid}} {{$random.integer()}} at {{$timestamp}}"
+}
+
+> {%
+    client.global.set("jobId", response.body.id);
+%}
+
+### Get Job
+GET http://{{HostAddress}}/api/jobs/{{jobId}}
+
+### Send POST request  
+POST http://{{HostAddress}}/api/jobs
+Content-Type: application/json
+
+{
+  "InputText": ""
 }

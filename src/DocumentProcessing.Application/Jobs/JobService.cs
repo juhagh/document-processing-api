@@ -31,9 +31,13 @@ public class JobService : IJobService
             JobId = job.Id
         };
 
-        await _publisher.PublishAsync(message, cancellationToken);
+        // In v1, mark the job as Queued before publishing to avoid a race where the worker
+        // consumes the message before the queued state is persisted.
+        // TODO: Replace this with an outbox pattern for stronger consistency guarantees.
         job.MarkQueued();
         await _repository.SaveChangesAsync(cancellationToken);
+        
+        await _publisher.PublishAsync(message, cancellationToken);
         
         return MapToJobResponseDto(job);
         
