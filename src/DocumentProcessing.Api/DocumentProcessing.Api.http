@@ -1,7 +1,7 @@
 @HostAddress = http://localhost:5031
 
 ### Send GET with ID to retrieve a particular job
-GET {{HostAddress}}/api/jobs/5
+GET {{HostAddress}}/api/jobs/14
 Accept: application/json
 
 ### Send GET to list all jobs
@@ -13,5 +13,13 @@ POST http://{{HostAddress}}/api/jobs
 Content-Type: application/json
 
 {
-  "InputText": "Test Document 10"
+  "InputText": "Input Text 13"
+}
+
+### Send POST request with json body
+POST http://{{HostAddress}}/api/jobs
+Content-Type: application/json
+
+{
+  "InputText": "This is a slightly more complex test document.\nIt contains multiple lines, some punctuation, and a few longer words.\nThe goal is to verify that analysis logic correctly counts words, characters, and lines.\n"
 }
