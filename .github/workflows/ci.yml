@@ -55,6 +55,23 @@ jobs:
       - name: Build solution
         run: dotnet build --no-restore --configuration Release
 
+      - name: Apply database migrations
+        env:
+          ConnectionStrings__DocumentProcessingDatabase: Host=localhost;Port=5432;Database=documentjobdb;Username=document_user;Password=document_password
+          RabbitMq__HostName: localhost
+          RabbitMq__UserName: document_user
+          RabbitMq__Password: document_password
+          RabbitMq__VirtualHost: document_processing
+          RabbitMq__Port: 5672
+          RabbitMq__ClientName: DocumentProcessingCi
+          RabbitMq__AutomaticRecoveryEnabled: true
+          RabbitMq__RequestedHeartbeat: 30
+          RabbitMq__QueueName: document-processing.jobs
+        run: |
+          dotnet ef database update \
+            --project src/DocumentProcessing.Infrastructure \
+            --startup-project src/DocumentProcessing.Api
+
       - name: Run tests
         env:
           ConnectionStrings__DocumentProcessingDatabase: Host=localhost;Port=5432;Database=documentjobdb;Username=document_user;Password=document_password
