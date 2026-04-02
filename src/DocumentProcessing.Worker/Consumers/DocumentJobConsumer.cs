@@ -3,8 +3,8 @@ using DocumentProcessing.Application.Interfaces;
 using DocumentProcessing.Application.Messaging;
 using DocumentProcessing.Domain.Entities;
 using DocumentProcessing.Domain.Enums;
-using DocumentProcessing.Domain.ValueObjects;
 using DocumentProcessing.Infrastructure.Messaging;
+using DocumentProcessing.Worker.Services;
 using Microsoft.Extensions.Options;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
@@ -17,17 +17,20 @@ public class DocumentJobConsumer : BackgroundService
     private readonly RabbitMqOptions _options;
     private readonly IServiceScopeFactory _serviceScopeFactory;
     private readonly ILogger<DocumentJobConsumer> _logger;
+    private readonly IDocumentAnalysisService _analysisService;
 
     public DocumentJobConsumer(
         ConnectionFactory connectionFactory, 
         IOptions<RabbitMqOptions> rabbitMqOptions,
         IServiceScopeFactory serviceScopeFactory, 
-        ILogger<DocumentJobConsumer> logger)
+        ILogger<DocumentJobConsumer> logger,
+        IDocumentAnalysisService documentAnalysisService)
     {
         _connectionFactory = connectionFactory;
         _options = rabbitMqOptions.Value;
         _serviceScopeFactory = serviceScopeFactory;
         _logger = logger;
+        _analysisService = documentAnalysisService;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -91,8 +94,6 @@ public class DocumentJobConsumer : BackgroundService
                 await channel.BasicAckAsync(ea.DeliveryTag, multiple: false, cancellationToken: cancellationToken);
                 return;
             }
-            
-            _logger.LogInformation("Started processing job {JobId}.", job.Id);
 
             if (job.Status != JobStatus.Queued)
             {
@@ -107,7 +108,9 @@ public class DocumentJobConsumer : BackgroundService
             job.MarkProcessing();
             await repo.SaveChangesAsync(cancellationToken);
 
-            var result = Analyze(job.InputText);
+            _logger.LogInformation("Started processing job {JobId}.", job.Id);
+            
+            var result = _analysisService.Analyze(job.InputText);
             
             job.MarkCompleted(result);
 
@@ -128,46 +131,5 @@ public class DocumentJobConsumer : BackgroundService
 
             await channel.BasicAckAsync(ea.DeliveryTag, multiple: false, cancellationToken: cancellationToken);
         }
-    }
-
-    private static DocumentAnalysisResult Analyze(string inputText)
-    {
-        var characterCount = inputText.Length;
-        var normalized = inputText
-            .Replace("\r\n", "\n")
-            .Replace('\r', '\n')
-            .TrimEnd('\n');
-
-        var lineCount = normalized.Length == 0
-            ? 0
-            : normalized.Split('\n').Length;
-        
-        var wordCount = 0;
-        var inWord = false;
-
-        foreach (var c in inputText.AsSpan())
-        {
-            if (char.IsWhiteSpace(c))
-                inWord = false;
-            else if (!inWord)
-            {
-                inWord = true;
-                wordCount++;
-            }
-        }
-
-        var keywordHits = 0;
-        var category = "General";
-        var summary = inputText.Length <= 120
-            ? inputText
-            : inputText[..120] + "...";
-
-        return new DocumentAnalysisResult(
-            WordCount: wordCount,
-            CharacterCount: characterCount,
-            LineCount: lineCount,
-            KeywordHits: keywordHits,
-            Category: category,
-            Summary: summary);
     }
 }
