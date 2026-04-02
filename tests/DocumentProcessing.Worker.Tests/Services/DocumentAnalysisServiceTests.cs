@@ -72,4 +72,13 @@ public class DocumentAnalysisServiceTests
         Assert.Equal(inputText, result.Summary);
         Assert.Equal("General", result.Category);
     }
+
+    [Fact]
+    public void Analyze_WithTriggerFailure_ThrowsInvalidOperationException()
+    {
+        var inputText = "TRIGGER_FAILURE";
+
+        var ex = Assert.Throws<InvalidOperationException>(() => _analysisService.Analyze(inputText));
+        Assert.Equal("Simulated failure for testing purposes.", ex.Message);
+    }
 }

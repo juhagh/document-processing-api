@@ -47,7 +47,7 @@ public class JobsControllerTests : IClassFixture<WebApplicationFactory<Program>>
     public async Task GetJobById_WhenJobExists_ReturnsJob()
     {
         var (_, job) = await CreateJobAndReadResponseAsync();
-        ArgumentNullException.ThrowIfNull(job);
+        Assert.NotNull(job);
         
         var response = await _client.GetAsync($"{JobsRoute}/{job.Id}");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -61,7 +61,7 @@ public class JobsControllerTests : IClassFixture<WebApplicationFactory<Program>>
     [Fact]
     public async Task GetJobById_WhenJobDoesNotExist_ReturnsNotFound()
     {
-        var response = await _client.GetAsync(JobsRoute + "/999999");
+        var response = await _client.GetAsync($"{JobsRoute}/999999");
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
     
@@ -98,8 +98,31 @@ public class JobsControllerTests : IClassFixture<WebApplicationFactory<Program>>
             Assert.True(testedJobs[i].SubmittedAtUtc >= testedJobs[i + 1].SubmittedAtUtc);
         }
     }
+
+    [Fact]
+    public async Task CreateDocumentJob_WithTriggerFailure_EventuallyReturnsFailedJob()
+    {
+        var request = new CreateJobRequest
+        {
+            InputText = "TRIGGER_FAILURE"
+        };
+
+        var response = await _client.PostAsJsonAsync(JobsRoute, request);
+        Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
+
+        var createdJob = await response.Content.ReadFromJsonAsync<JobResponse>(JsonOptions);
+        Assert.NotNull(createdJob);
+
+        var failedJob = await WaitForJobStatusAsync(
+            createdJob!.Id,
+            JobStatus.Failed,
+            TimeSpan.FromSeconds(5));
+
+        Assert.Equal(JobStatus.Failed, failedJob.Status);
+        Assert.False(string.IsNullOrWhiteSpace(failedJob.ErrorMessage));
+    }
     
-    private async Task<(HttpResponseMessage Response, JobResponse? Job)> CreateJobAndReadResponseAsync()
+    private async Task<(HttpResponseMessage Response, JobResponse Job)> CreateJobAndReadResponseAsync()
     {
         var request = new CreateJobRequest
         {
@@ -107,9 +130,53 @@ public class JobsControllerTests : IClassFixture<WebApplicationFactory<Program>>
         };
 
         var response = await _client.PostAsJsonAsync(JobsRoute, request);
+        Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
+        
         var job = await response.Content.ReadFromJsonAsync<JobResponse>(JsonOptions);
+        Assert.NotNull(job);
  
         return (response, job);
+    }
+    
+    private async Task<JobResponse> WaitForJobStatusAsync(
+        int jobId,
+        JobStatus expectedStatus,
+        TimeSpan timeout)
+    {
+        var deadline = DateTime.UtcNow + timeout;
+        JobResponse? lastSeenJob = null;
+
+        while (DateTime.UtcNow < deadline)
+        {
+            var response = await _client.GetAsync($"{JobsRoute}/{jobId}");
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+            var job = await response.Content.ReadFromJsonAsync<JobResponse>(JsonOptions);
+            Assert.NotNull(job);
+
+            lastSeenJob = job;
+
+            if (job.Status == expectedStatus)
+                return job;
+
+            var isTerminal =
+                job.Status == JobStatus.Completed ||
+                job.Status == JobStatus.Failed;
+
+            if (isTerminal && job.Status != expectedStatus)
+            {
+                throw new Xunit.Sdk.XunitException(
+                    $"Job {jobId} reached terminal status {job.Status} " +
+                    $"but expected {expectedStatus}. " +
+                    $"ErrorMessage: {job.ErrorMessage ?? "<null>"}");
+            }
+
+            await Task.Delay(200);
+        }
+
+        throw new TimeoutException(
+            $"Job {jobId} did not reach status {expectedStatus} within {timeout.TotalSeconds} seconds. " +
+            $"Last observed status: {lastSeenJob?.Status.ToString() ?? "<none>"}");
     }
     
 }

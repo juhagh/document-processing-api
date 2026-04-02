@@ -8,6 +8,10 @@ public class DocumentAnalysisService : IDocumentAnalysisService
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(inputText);
         
+        // Deterministic fault injection for testing failed-job handling.
+        if (inputText == "TRIGGER_FAILURE")
+            throw new InvalidOperationException("Simulated failure for testing purposes.");
+        
         var characterCount = inputText.Length;
         var normalized = inputText
             .Replace("\r\n", "\n")
