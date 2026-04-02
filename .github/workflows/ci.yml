@@ -1,0 +1,70 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: documentjobdb
+          POSTGRES_USER: document_user
+          POSTGRES_PASSWORD: document_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U document_user -d documentjobdb"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+      rabbitmq:
+        image: rabbitmq:3-management
+        env:
+          RABBITMQ_DEFAULT_USER: document_user
+          RABBITMQ_DEFAULT_PASS: document_password
+          RABBITMQ_DEFAULT_VHOST: document_processing
+        ports:
+          - 5672:5672
+          - 15672:15672
+        options: >-
+          --health-cmd="rabbitmq-diagnostics check_port_connectivity"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore dependencies
+        run: dotnet restore
+
+      - name: Build solution
+        run: dotnet build --no-restore --configuration Release
+
+      - name: Run tests
+        env:
+          ConnectionStrings__DocumentProcessingDatabase: Host=localhost;Port=5432;Database=documentjobdb;Username=document_user;Password=document_password
+          RabbitMq__HostName: localhost
+          RabbitMq__UserName: document_user
+          RabbitMq__Password: document_password
+          RabbitMq__VirtualHost: document_processing
+          RabbitMq__Port: 5672
+          RabbitMq__ClientName: DocumentProcessingCi
+          RabbitMq__AutomaticRecoveryEnabled: true
+          RabbitMq__RequestedHeartbeat: 30
+          RabbitMq__QueueName: document-processing.jobs
+        run: dotnet test --no-build --configuration Release --verbosity normal
