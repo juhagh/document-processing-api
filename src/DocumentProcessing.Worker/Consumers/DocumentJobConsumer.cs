@@ -133,7 +133,15 @@ public class DocumentJobConsumer : BackgroundService
     private static DocumentAnalysisResult Analyze(string inputText)
     {
         var characterCount = inputText.Length;
-        var lineCount = inputText.Split('\n').Length;
+        var normalized = inputText
+            .Replace("\r\n", "\n")
+            .Replace('\r', '\n')
+            .TrimEnd('\n');
+
+        var lineCount = normalized.Length == 0
+            ? 0
+            : normalized.Split('\n').Length;
+        
         var wordCount = 0;
         var inWord = false;
 
