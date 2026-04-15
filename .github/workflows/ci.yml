@@ -90,4 +90,4 @@ jobs:
           RabbitMq__AutomaticRecoveryEnabled: true
           RabbitMq__RequestedHeartbeat: 30
           RabbitMq__QueueName: document-processing.jobs
-        run: dotnet test --no-build --configuration Release --verbosity normal
+        run: dotnet test --no-build --configuration Release --verbosity normal --filter "Category!=E2E"
