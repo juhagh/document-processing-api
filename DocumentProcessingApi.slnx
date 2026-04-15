@@ -12,6 +12,7 @@
   <Folder Name="/tests/">
     <Project Path="tests/DocumentProcessing.Api.Tests/DocumentProcessing.Api.Tests.csproj" />
     <Project Path="tests/DocumentProcessing.Domain.Tests/DocumentProcessing.Domain.Tests.csproj" />
+    <Project Path="tests/DocumentProcessing.E2E.Tests/DocumentProcessing.E2E.Tests.csproj" />
     <Project Path="tests/DocumentProcessing.Worker.Tests/DocumentProcessing.Worker.Tests.csproj" />
   </Folder>
 </Solution>
