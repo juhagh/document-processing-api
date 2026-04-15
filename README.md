@@ -1,5 +1,10 @@
 # Document Processing API
 [![CI](https://github.com/juhagh/document-processing-api/actions/workflows/ci.yml/badge.svg)](https://github.com/juhagh/document-processing-api/actions/workflows/ci.yml)
+[![.NET](https://img.shields.io/badge/.NET-10-512BD4?logo=dotnet)](https://dotnet.microsoft.com)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-336791?logo=postgresql&logoColor=white)](https://www.postgresql.org)
+[![RabbitMQ](https://img.shields.io/badge/RabbitMQ-3-FF6600?logo=rabbitmq&logoColor=white)](https://www.rabbitmq.com)
+[![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)](https://www.docker.com)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
 
 An event-driven ASP.NET Core backend that accepts document-analysis jobs through a Web API, stores job state in PostgreSQL, and processes jobs asynchronously using RabbitMQ and a background worker.
 
@@ -12,10 +17,10 @@ This portfolio project is built to demonstrate employable .NET backend skills be
 - message-driven architecture
 - explicit job lifecycle management
 - PostgreSQL persistence with EF Core
-- Dockerized local infrastructure
+- fully containerised application and infrastructure
 - layered architecture
 - automated testing
-- GitHub Actions CI with PostgreSQL and RabbitMQ services
+- GitHub Actions CI
 
 In the current version, the API accepts **text input** rather than real file uploads. A client submits a document-processing job, the API stores the job, marks it as queued, publishes a RabbitMQ message, and a worker processes the job asynchronously. The client can then query job status and results later.
 
@@ -30,9 +35,9 @@ This project is designed to show practical backend skills that map to real syste
 - explicit domain state transitions
 - polling-based async job tracking
 - clean separation of concerns across layers
-- Docker Compose local development setup
-- integration and domain testing
-- GitHub Actions CI with PostgreSQL and RabbitMQ services
+- fully containerised local development with Docker Compose
+- integration, domain, and worker unit testing
+- GitHub Actions CI
 
 ## Current Tech Stack
 
@@ -47,6 +52,7 @@ This project is designed to show practical backend skills that map to real syste
 - GitHub Actions
 
 ## Related Repositories
+
 - [Document Processing UI](https://github.com/juhagh/document-processing-ui) — React frontend
 
 ## Solution Structure
@@ -63,6 +69,7 @@ tests/
   DocumentProcessing.Api.Tests
   DocumentProcessing.Domain.Tests
   DocumentProcessing.Worker.Tests
+  DocumentProcessing.E2E.Tests
 ```
 
 ### Layer Responsibilities
@@ -133,11 +140,11 @@ Returns jobs ordered by SubmittedAtUtc descending.
 
 ```json
 {
-  "id": 144,
+  "id": 1,
   "status": "Queued",
   "inputText": "This is a test document.\nIt has multiple lines.\n",
-  "submittedAtUtc": "2026-04-02T04:17:00.688481Z",
-  "updatedAtUtc": "2026-04-02T04:17:01.133146Z",
+  "submittedAtUtc": "2026-04-15T05:30:40.209483Z",
+  "updatedAtUtc": "2026-04-15T05:30:40.283789Z",
   "completedAtUtc": null,
   "errorMessage": null,
   "wordCount": null,
@@ -153,12 +160,12 @@ Returns jobs ordered by SubmittedAtUtc descending.
 
 ```json
 {
-  "id": 144,
+  "id": 1,
   "status": "Completed",
   "inputText": "This is a test document.\nIt has multiple lines.\n",
-  "submittedAtUtc": "2026-04-02T04:17:00.688481Z",
-  "updatedAtUtc": "2026-04-02T04:17:35.764846Z",
-  "completedAtUtc": "2026-04-02T04:17:35.764846Z",
+  "submittedAtUtc": "2026-04-15T05:30:40.209483Z",
+  "updatedAtUtc": "2026-04-15T05:30:40.796823Z",
+  "completedAtUtc": "2026-04-15T05:30:40.796823Z",
   "errorMessage": null,
   "wordCount": 9,
   "characterCount": 48,
@@ -170,6 +177,7 @@ Returns jobs ordered by SubmittedAtUtc descending.
 ```
 
 ### Current Processing Flow
+
 1. Client submits a document job to `POST /api/jobs`, job initial state is `Pending`
 2. API creates the job in PostgreSQL
 3. API marks the job as `Queued`
@@ -198,15 +206,51 @@ Returns jobs ordered by SubmittedAtUtc descending.
 
 ## Running Locally
 
-**1. Start infrastructure**
+### Prerequisites
+
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/)
+
+### Start the full stack
 
 ```bash
 docker compose up -d
 ```
 
-Current Docker services:
+This starts all services:
 - PostgreSQL
-- RabbitMQ with management UI
+- RabbitMQ
+- API (available at `http://localhost:8080`)
+- Worker
+
+Database migrations are applied automatically on API startup.
+
+### Submit a job
+
+```bash
+curl -X POST http://localhost:8080/api/jobs \
+  -H "Content-Type: application/json" \
+  -d '{"inputText": "Hello from the fully containerised stack!"}'
+```
+
+### Check job status
+
+```bash
+curl http://localhost:8080/api/jobs/{id}
+```
+
+### RabbitMQ Management UI
+
+Available at `http://localhost:15672` using the credentials configured in `docker-compose.yml`.
+
+### Running locally without Docker (development)
+
+If you prefer to run the API and worker directly for faster iteration:
+
+**1. Start infrastructure only**
+
+```bash
+docker compose up -d postgres rabbitmq
+```
 
 **2. Apply database migrations**
 
@@ -216,35 +260,16 @@ dotnet ef database update \
   --startup-project src/DocumentProcessing.Api
 ```
 
-**3. Run the API**
+**3. Run the API and worker**
 
 ```bash
 dotnet run --project src/DocumentProcessing.Api
-```
-
-**4. Run the worker**
-
-```bash
 dotnet run --project src/DocumentProcessing.Worker
 ```
 
-**5. Submit and query jobs**
-
-Use the .http file, curl, Postman, or Swagger/OpenAPI as appropriate.
-
-## RabbitMQ Management UI
-
-RabbitMQ management UI is available locally at:
-- `http://localhost:15672`
-
-Use the credentials configured in `docker-compose.yml` / appsettings.
-
 ## Testing
 
-Current automated tests include:
-
 ### Domain tests
-
 - job creation
 - valid transitions
 - invalid transitions
@@ -252,32 +277,45 @@ Current automated tests include:
 - completion result mapping
 
 ### API integration tests
-
 - create job returns accepted response
 - get job by id returns persisted job
 - get job by id returns 404 when missing
 - list jobs returns jobs ordered by submission time
 
-### Worker tests
-
+### Worker unit tests
 - document analysis returns expected counts for single-line input
 - document analysis returns expected counts for multiline input
 - trailing newline does not create an extra counted line
 - long input truncates summary correctly
 
+### E2E tests
+- full job lifecycle from submission to completion
+- full job lifecycle from submission to failure
+
+> E2E tests require the full stack to be running via `docker compose up`.
+
+### Running the test suite
+
+```bash
+# Unit and integration tests
+dotnet test --filter "Category!=E2E"
+
+# E2E tests (requires docker compose up)
+dotnet test --filter "Category=E2E"
+```
+
 ## Continuous Integration
 
-GitHub Actions CI is configured for this repository.
+GitHub Actions CI is configured for this repository and runs on every push.
 
-The workflow currently:
-
+The workflow:
 - restores dependencies
 - builds the solution
 - provisions PostgreSQL and RabbitMQ service containers
 - applies EF Core migrations
-- runs the test suite
+- runs unit and integration tests
 
-This helps validate that the API, worker, and supporting infrastructure work together in an automated environment.
+E2E tests are excluded from CI and are intended to be run against a locally running stack.
 
 ## Important Design Notes
 
@@ -296,6 +334,10 @@ This still leaves a consistency gap:
 then the job may remain Queued without a corresponding broker message.
 
 In a production system, this would typically be addressed with an **outbox pattern**.
+
+### Auto-migration on startup
+
+The API automatically applies pending EF Core migrations on startup. This ensures the database schema is always up to date when running via Docker Compose without any manual steps.
 
 ## Current Limitations
 
@@ -319,12 +361,11 @@ Possible next steps:
 - dead-letter queue / retry handling
 - richer keyword analysis and categorisation
 - pagination and filtering for job queries
-- additional integration tests around async processing
-- containerised API and worker execution
+- React frontend for job submission and status tracking
 
 ## Why This Project Exists
 
-I’m transitioning into .NET backend development from a senior integration / telecom engineering background. This project is intended to demonstrate backend skills that map to real production systems: asynchronous workflows, messaging, persistence, background processing, lifecycle management, and operational thinking.
+I'm transitioning into .NET backend development from a senior integration / telecom engineering background. This project is intended to demonstrate backend skills that map to real production systems: asynchronous workflows, messaging, persistence, background processing, lifecycle management, and operational thinking.
 
 ## License
 
