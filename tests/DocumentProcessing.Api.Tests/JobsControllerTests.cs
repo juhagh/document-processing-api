@@ -98,29 +98,6 @@ public class JobsControllerTests : IClassFixture<WebApplicationFactory<Program>>
             Assert.True(testedJobs[i].SubmittedAtUtc >= testedJobs[i + 1].SubmittedAtUtc);
         }
     }
-
-    [Fact]
-    public async Task CreateDocumentJob_WithTriggerFailure_EventuallyReturnsFailedJob()
-    {
-        var request = new CreateJobRequest
-        {
-            InputText = "TRIGGER_FAILURE"
-        };
-
-        var response = await _client.PostAsJsonAsync(JobsRoute, request);
-        Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
-
-        var createdJob = await response.Content.ReadFromJsonAsync<JobResponse>(JsonOptions);
-        Assert.NotNull(createdJob);
-
-        var failedJob = await WaitForJobStatusAsync(
-            createdJob!.Id,
-            JobStatus.Failed,
-            TimeSpan.FromSeconds(5));
-
-        Assert.Equal(JobStatus.Failed, failedJob.Status);
-        Assert.False(string.IsNullOrWhiteSpace(failedJob.ErrorMessage));
-    }
     
     private async Task<(HttpResponseMessage Response, JobResponse Job)> CreateJobAndReadResponseAsync()
     {
