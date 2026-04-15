@@ -1,6 +1,8 @@
 using System.Text.Json.Serialization;
 using DocumentProcessing.Application.DependencyInjection;
 using DocumentProcessing.Infrastructure.DependencyInjection;
+using DocumentProcessing.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -27,6 +29,13 @@ var app = builder.Build();
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
+}
+
+// Auto-apply migrations on startup
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<DocumentProcessingDbContext>();
+    await db.Database.MigrateAsync();
 }
 
 app.UseHttpsRedirection();
