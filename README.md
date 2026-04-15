@@ -46,6 +46,9 @@ This project is designed to show practical backend skills that map to real syste
 - xUnit
 - GitHub Actions
 
+## Related Repositories
+- [Document Processing UI](https://github.com/juhagh/document-processing-ui) — React frontend
+
 ## Solution Structure
 
 ```text
