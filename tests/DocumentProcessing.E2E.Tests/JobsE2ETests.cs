@@ -88,7 +88,7 @@ public class JobsE2ETests
     }
     
     private async Task<JobResponse> WaitForJobStatusAsync(
-        int jobId,
+        Guid jobId,
         JobStatus expectedStatus,
         TimeSpan timeout)
     {

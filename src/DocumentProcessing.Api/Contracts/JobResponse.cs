@@ -4,7 +4,7 @@ namespace DocumentProcessing.Api.Contracts;
 
 public class JobResponse
 {
-    public int Id { get; init; }
+    public Guid Id { get; init; }
     public JobStatus Status { get; init; }
     public required string InputText { get; init; }
     public DateTime SubmittedAtUtc { get; init; }

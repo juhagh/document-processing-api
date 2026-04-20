@@ -5,8 +5,8 @@ namespace DocumentProcessing.Application.Interfaces;
 public interface IJobRepository
 {
     Task AddAsync(DocumentJob job, CancellationToken cancellationToken = default);
-    Task<DocumentJob?> GetByIdAsync(int id, CancellationToken cancellationToken = default);
+    Task<DocumentJob?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<DocumentJob>> GetAllAsync(CancellationToken cancellationToken = default);
-    Task<DocumentJob?> GetTrackedByIdAsync(int id, CancellationToken cancellationToken = default); 
+    Task<DocumentJob?> GetTrackedByIdAsync(Guid id, CancellationToken cancellationToken = default); 
     Task SaveChangesAsync(CancellationToken cancellationToken = default);
 }

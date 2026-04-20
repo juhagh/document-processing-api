@@ -43,7 +43,7 @@ public class JobService : IJobService
         
     }
 
-    public async Task<JobResponseDto?> GetByIdAsync(int id, CancellationToken cancellationToken = default)
+    public async Task<JobResponseDto?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
         var job = await _repository.GetByIdAsync(id, cancellationToken);
 

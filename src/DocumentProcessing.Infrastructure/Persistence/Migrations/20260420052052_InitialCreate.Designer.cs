@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace DocumentProcessing.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(DocumentProcessingDbContext))]
-    [Migration("20260327023251_InitialCreate")]
+    [Migration("20260420052052_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
@@ -27,11 +27,9 @@ namespace DocumentProcessing.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("DocumentProcessing.Domain.Entities.DocumentJob", b =>
                 {
-                    b.Property<int>("Id")
+                    b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+                        .HasColumnType("uuid");
 
                     b.Property<string>("Category")
                         .HasMaxLength(200)

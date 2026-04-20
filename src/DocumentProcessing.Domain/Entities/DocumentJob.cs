@@ -11,6 +11,7 @@ public class DocumentJob
         
         var timeStamp = DateTime.UtcNow;
 
+        Id = Guid.NewGuid();
         InputText = inputText;
         Status = JobStatus.Pending;
         SubmittedAtUtc = timeStamp;
@@ -20,7 +21,7 @@ public class DocumentJob
     private DocumentJob() { }
     
     // Job
-    public int Id { get; private set; }
+    public Guid Id { get; private set; }
     public string InputText { get; private set; } = null!;
     public JobStatus Status { get; private set; }
     public DateTime SubmittedAtUtc { get; private set; }

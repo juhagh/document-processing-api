@@ -27,8 +27,8 @@ public class JobsController : ControllerBase
         return Ok(jobList);
     }
     
-    [HttpGet("{id:int}")]
-    public async Task<ActionResult<JobResponse>> GetJobById(int id, CancellationToken cancellationToken)
+    [HttpGet("{id:guid}")]
+    public async Task<ActionResult<JobResponse>> GetJobById(Guid id, CancellationToken cancellationToken)
     {
         var job = await _jobService.GetByIdAsync(id, cancellationToken);
 
@@ -49,7 +49,6 @@ public class JobsController : ControllerBase
         
         var job = await _jobService.CreateAsync(dto, cancellationToken);
         
-        // return CreatedAtAction(nameof(GetJobById), new { id = job.Id }, MapToResponse(job));
         return AcceptedAtAction(nameof(GetJobById), new { Id = job.Id }, MapToResponse(job));
 
     }

@@ -39,7 +39,7 @@ public class JobsControllerTests : IClassFixture<WebApplicationFactory<Program>>
         Assert.NotNull(jobResponse);
         Assert.Equal("Test Input", jobResponse.InputText);
         Assert.Equal(JobStatus.Queued, jobResponse.Status);
-        Assert.NotEqual(0, jobResponse.Id);
+        Assert.NotEqual(Guid.Empty, jobResponse.Id);
         Assert.Equal($"/api/jobs/{jobResponse.Id}", response.Headers.Location?.PathAndQuery);
     }
 
@@ -116,7 +116,7 @@ public class JobsControllerTests : IClassFixture<WebApplicationFactory<Program>>
     }
     
     private async Task<JobResponse> WaitForJobStatusAsync(
-        int jobId,
+        Guid jobId,
         JobStatus expectedStatus,
         TimeSpan timeout)
     {
