@@ -16,4 +16,5 @@ public class DocumentProcessingDbContext : DbContext
     }
     
     public DbSet<DocumentJob> DocumentJobs => Set<DocumentJob>();
+    public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
 }

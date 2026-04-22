@@ -13,7 +13,6 @@ public class DocumentJobConfiguration : IEntityTypeConfiguration<DocumentJob>
         
         // 2. Primary key
         builder.HasKey(j => j.Id);
-        builder.Property(j => j.Id);
         
         // 3. Property configurations
         // Required

@@ -20,9 +20,4 @@
     <ProjectReference Include="..\DocumentProcessing.Infrastructure\DocumentProcessing.Infrastructure.csproj" />
   </ItemGroup>
 
-  <ItemGroup>
-    <Folder Include="Extensions\" />
-    <Folder Include="Mappings\" />
-  </ItemGroup>
-
 </Project>

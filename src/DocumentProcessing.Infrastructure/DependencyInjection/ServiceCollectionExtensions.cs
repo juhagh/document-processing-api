@@ -23,6 +23,7 @@ public static class ServiceCollectionExtensions
             options.UseNpgsql(connectionString));
         
         services.AddScoped<IJobRepository, JobRepository>();
+        services.AddScoped<IOutboxRepository, OutboxRepository>();
 
         services.AddOptions<RabbitMqOptions>()
             .Bind(configuration.GetSection("RabbitMq"))

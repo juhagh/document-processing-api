@@ -1,6 +1,7 @@
 using DocumentProcessing.Application.DTOs;
 using DocumentProcessing.Application.Interfaces;
 using DocumentProcessing.Application.Messaging;
+using DocumentProcessing.Application.Outbox;
 using DocumentProcessing.Domain.Entities;
 
 namespace DocumentProcessing.Application.Jobs;
@@ -8,13 +9,13 @@ namespace DocumentProcessing.Application.Jobs;
 public class JobService : IJobService
 {
     
-    private readonly IJobRepository _repository;
-    private readonly IJobMessagePublisher _publisher;
+    private readonly IJobRepository _jobRepository;
+    private readonly IOutboxRepository _outboxRepository;
 
-    public JobService(IJobRepository repository, IJobMessagePublisher publisher)
+    public JobService(IJobRepository jobRepository, IOutboxRepository outboxRepository)
     {
-        _repository = repository;
-        _publisher = publisher;
+        _jobRepository = jobRepository;
+        _outboxRepository = outboxRepository;
     }
     
     public async Task<JobResponseDto> CreateAsync(CreateJobRequestDto request,
@@ -23,36 +24,34 @@ public class JobService : IJobService
         ArgumentNullException.ThrowIfNull(request);
         
         var job = DocumentJob.Create(request.InputText);
-        await _repository.AddAsync(job, cancellationToken);
-        await _repository.SaveChangesAsync(cancellationToken);
         
-        var message = new ProcessDocumentJobMessage
+        var jobMessage = new ProcessDocumentJobMessage
         {
             JobId = job.Id
         };
 
-        // In v1, mark the job as Queued before publishing to avoid a race where the worker
-        // consumes the message before the queued state is persisted.
-        // TODO: Replace this with an outbox pattern for stronger consistency guarantees.
-        job.MarkQueued();
-        await _repository.SaveChangesAsync(cancellationToken);
+        var outboxMessage = OutboxMessageFactory.Create(jobMessage);
         
-        await _publisher.PublishAsync(message, cancellationToken);
+        job.MarkQueued();
+        
+        await _jobRepository.AddAsync(job, cancellationToken);
+        await _outboxRepository.AddAsync(outboxMessage, cancellationToken);
+        
+        await _jobRepository.SaveChangesAsync(cancellationToken);
         
         return MapToJobResponseDto(job);
-        
     }
 
     public async Task<JobResponseDto?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
-        var job = await _repository.GetByIdAsync(id, cancellationToken);
+        var job = await _jobRepository.GetByIdAsync(id, cancellationToken);
 
         return job is null ? null : MapToJobResponseDto(job);
     }
 
     public async Task<IReadOnlyList<JobResponseDto>> GetAllAsync(CancellationToken cancellationToken = default)
     {
-        var jobs = await _repository.GetAllAsync(cancellationToken);
+        var jobs = await _jobRepository.GetAllAsync(cancellationToken);
         var jobList = jobs
             .Select(MapToJobResponseDto)
             .ToList()

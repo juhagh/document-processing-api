@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using DocumentProcessing.Api.BackgroundServices;
 using DocumentProcessing.Application.DependencyInjection;
 using DocumentProcessing.Infrastructure.DependencyInjection;
 using DocumentProcessing.Infrastructure.Persistence;
@@ -22,6 +23,9 @@ builder.Services
 builder.Services.AddOpenApi();
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
+builder.Services.AddHostedService<OutboxPublisherService>();
+builder.Services.Configure<OutboxOptions>(
+    builder.Configuration.GetSection("OutboxOptions"));
 
 var app = builder.Build();
 

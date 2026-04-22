@@ -15,8 +15,4 @@
     <ProjectReference Include="..\DocumentProcessing.Application\DocumentProcessing.Application.csproj" />
     <ProjectReference Include="..\DocumentProcessing.Infrastructure\DocumentProcessing.Infrastructure.csproj" />
   </ItemGroup>
-
-  <ItemGroup>
-    <Folder Include="Extensions\" />
-  </ItemGroup>
 </Project>
