@@ -1,6 +1,66 @@
+using DocumentProcessing.Domain.Entities;
+
 namespace DocumentProcessing.Domain.Tests;
 
 public class OutboxMessageTests
 {
+    private const string OutboxMessageType = "process-document-job";
     
+    [Fact]
+    public void Create_WithValidInputText_ShouldCreateOutboxMessage()
+    {
+        var messageContent = Guid.NewGuid().ToString();
+        var outboxMessage = OutboxMessage.Create(OutboxMessageType, messageContent);
+
+        Assert.NotNull(outboxMessage);
+        Assert.Equal(OutboxMessageType, outboxMessage.Type);
+        Assert.Equal(messageContent, outboxMessage.Content);
+        Assert.Null(outboxMessage.PublishedOnUtc);
+        Assert.Null(outboxMessage.ErrorMessage);
+    }
+
+    [Fact]
+    public void Create_WithEmptyType_ShouldThrow()
+    {
+        var messageContent = Guid.NewGuid().ToString();
+        Assert.Throws<ArgumentException>(() => OutboxMessage.Create("", messageContent));
+    }
+    
+    [Fact]
+    public void Create_WithEmptyContent_ShouldThrow()
+    {
+        Assert.Throws<ArgumentException>(() => OutboxMessage.Create(OutboxMessageType, ""));
+    }
+    
+    [Fact]
+    public void MarkPublished_WhenAlreadyPublished_ShouldThrow()
+    {
+        var messageContent = Guid.NewGuid().ToString();
+        var outboxMessage = OutboxMessage.Create(OutboxMessageType, messageContent);
+
+        outboxMessage.MarkPublished();
+        Assert.NotNull(outboxMessage.PublishedOnUtc);
+
+        Assert.Throws<InvalidOperationException>(outboxMessage.MarkPublished);
+    }
+
+    [Fact]
+    public void RecordError_WhenAlreadyPublished_ShouldThrow()
+    {
+        var messageContent = Guid.NewGuid().ToString();
+        var outboxMessage = OutboxMessage.Create(OutboxMessageType, messageContent);
+
+        outboxMessage.MarkPublished();
+        
+        Assert.Throws<InvalidOperationException>(() => outboxMessage.RecordError("Error"));
+    }
+
+    [Fact]
+    public void RecordError_WithEmptyMessage_ShouldThrow()
+    {
+        var messageContent = Guid.NewGuid().ToString();
+        var outboxMessage = OutboxMessage.Create(OutboxMessageType, messageContent);
+        
+        Assert.Throws<ArgumentException>(() => outboxMessage.RecordError(""));
+    }
 }
