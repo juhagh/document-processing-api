@@ -30,10 +30,10 @@ public class OutboxPublisherService : BackgroundService
         while (!stoppingToken.IsCancellationRequested)
         {
             await using var scope = _serviceScopeFactory.CreateAsyncScope();
-            var repo = scope.ServiceProvider.GetRequiredService<IOutboxRepository>();
+            var repo = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
             var publisher = scope.ServiceProvider.GetRequiredService<IJobMessagePublisher>();
 
-            var messages = await repo.GetUnpublishedAsync(_options.BatchSize, stoppingToken);
+            var messages = await repo.OutboxRepository.GetUnpublishedAsync(_options.BatchSize, stoppingToken);
             if (messages.Count > 0)
             {
                 _logger.LogInformation("Processing {count} outbox messages", messages.Count);
@@ -72,7 +72,7 @@ public class OutboxPublisherService : BackgroundService
                     _logger.LogError(ex, "Error processing outbox message {id}", message.Id);
                 }
             }
-            await repo.SaveChangesAsync(stoppingToken);
+            await repo.CommitAsync(stoppingToken);
             await Task.Delay(_options.Interval, stoppingToken);   
         }
         

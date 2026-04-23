@@ -81,13 +81,13 @@ public class DocumentJobConsumer : BackgroundService
         
         await using var scope = _serviceScopeFactory.CreateAsyncScope();
         
-        var repo = scope.ServiceProvider.GetRequiredService<IJobRepository>();
+        var repo = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
         
         DocumentJob? job = null;
         
         try
         {
-            job = await repo.GetTrackedByIdAsync(message.JobId, cancellationToken);
+            job = await repo.JobRepository.GetTrackedByIdAsync(message.JobId, cancellationToken);
             if (job is null)
             {
                 _logger.LogWarning("Job {JobId} was not found.", message.JobId);
@@ -106,7 +106,7 @@ public class DocumentJobConsumer : BackgroundService
             }
             
             job.MarkProcessing();
-            await repo.SaveChangesAsync(cancellationToken);
+            await repo.CommitAsync(cancellationToken);
 
             _logger.LogInformation("Started processing job {JobId}.", job.Id);
             
@@ -114,7 +114,7 @@ public class DocumentJobConsumer : BackgroundService
             
             job.MarkCompleted(result);
 
-            await repo.SaveChangesAsync(cancellationToken);
+            await repo.CommitAsync(cancellationToken);
             await channel.BasicAckAsync(ea.DeliveryTag, multiple: false, cancellationToken: cancellationToken);
             
             _logger.LogInformation("Completed processing job {JobId}.", job.Id);
@@ -126,7 +126,7 @@ public class DocumentJobConsumer : BackgroundService
             if (job is not null && job.Status == JobStatus.Processing)
             {
                 job.MarkFailed(ex.Message);
-                await repo.SaveChangesAsync(cancellationToken);
+                await repo.CommitAsync(cancellationToken);
             }
 
             await channel.BasicAckAsync(ea.DeliveryTag, multiple: false, cancellationToken: cancellationToken);

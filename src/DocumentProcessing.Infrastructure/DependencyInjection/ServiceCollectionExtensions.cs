@@ -1,6 +1,7 @@
 using DocumentProcessing.Application.Interfaces;
 using DocumentProcessing.Infrastructure.Messaging;
 using DocumentProcessing.Infrastructure.Persistence;
+using DocumentProcessing.Infrastructure.Persistence.UnitOfWork;
 using DocumentProcessing.Infrastructure.Repositories;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -24,6 +25,7 @@ public static class ServiceCollectionExtensions
         
         services.AddScoped<IJobRepository, JobRepository>();
         services.AddScoped<IOutboxRepository, OutboxRepository>();
+        services.AddScoped<IUnitOfWork, UnitOfWork>();
 
         services.AddOptions<RabbitMqOptions>()
             .Bind(configuration.GetSection("RabbitMq"))
