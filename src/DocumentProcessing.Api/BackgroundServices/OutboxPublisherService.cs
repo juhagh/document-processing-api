@@ -1,6 +1,7 @@
 using System.Text.Json;
 using DocumentProcessing.Application.Interfaces;
 using DocumentProcessing.Application.Messaging;
+using DocumentProcessing.Application.Outbox;
 using DocumentProcessing.Domain.Entities;
 using Microsoft.Extensions.Options;
 
@@ -45,7 +46,7 @@ public class OutboxPublisherService : BackgroundService
                 {
                     switch (message.Type)
                     {
-                        case "process-document-job":
+                        case OutboxMessageFactory.MessageType:
                         {
                             var jobMessage = JsonSerializer.Deserialize<ProcessDocumentJobMessage>(message.Content);
                             if (jobMessage == null)

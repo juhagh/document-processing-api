@@ -6,7 +6,7 @@ namespace DocumentProcessing.Application.Outbox;
 
 public static class OutboxMessageFactory
 {
-    private const string MessageType = "process-document-job";
+    public const string MessageType = "process-document-job";
     
     public static OutboxMessage Create(ProcessDocumentJobMessage jobMessage)
     {
