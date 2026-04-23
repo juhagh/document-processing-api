@@ -73,7 +73,9 @@ public class OutboxPublisherService : BackgroundService
                     _logger.LogError(ex, "Error processing outbox message {id}", message.Id);
                 }
             }
-            await repo.CommitAsync(stoppingToken);
+            if (messages.Count > 0)
+                await repo.CommitAsync(stoppingToken);
+            
             await Task.Delay(_options.Interval, stoppingToken);   
         }
         
