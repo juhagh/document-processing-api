@@ -16,13 +16,14 @@ This portfolio project is built to demonstrate employable .NET backend skills be
 - worker-based background execution
 - message-driven architecture
 - explicit job lifecycle management
+- outbox pattern
 - PostgreSQL persistence with EF Core
 - fully containerised application and infrastructure
 - layered architecture
 - automated testing
 - GitHub Actions CI
 
-In the current version, the API accepts **text input** rather than real file uploads. A client submits a document-processing job, the API stores the job, marks it as queued, publishes a RabbitMQ message, and a worker processes the job asynchronously. The client can then query job status and results later.
+In the current version, the API accepts **text input** rather than real file uploads. A client submits a document-processing job, the API stores the job and outbox message, and marks the job as queued.  Publisher periodically polls outbox for unpublished messages, processes them in batches and publishes to RabbitMQ. A worker then processes the job asynchronously. The client can then query job status and results later.
 
 ## What This Project Demonstrates
 
@@ -34,6 +35,7 @@ This project is designed to show practical backend skills that map to real syste
 - Background worker processing
 - explicit domain state transitions
 - polling-based async job tracking
+- outbox pattern
 - clean separation of concerns across layers
 - fully containerised local development with Docker Compose
 - integration, domain, and worker unit testing
@@ -140,7 +142,7 @@ Returns jobs ordered by SubmittedAtUtc descending.
 
 ```json
 {
-  "id": 1,
+  "id": "c6147881-a3a7-41fb-97f7-f96d12e62e58",
   "status": "Queued",
   "inputText": "This is a test document.\nIt has multiple lines.\n",
   "submittedAtUtc": "2026-04-15T05:30:40.209483Z",
@@ -160,7 +162,7 @@ Returns jobs ordered by SubmittedAtUtc descending.
 
 ```json
 {
-  "id": 1,
+  "id": "c6147881-a3a7-41fb-97f7-f96d12e62e58",
   "status": "Completed",
   "inputText": "This is a test document.\nIt has multiple lines.\n",
   "submittedAtUtc": "2026-04-15T05:30:40.209483Z",
@@ -179,15 +181,15 @@ Returns jobs ordered by SubmittedAtUtc descending.
 ### Current Processing Flow
 
 1. Client submits a document job to `POST /api/jobs`, job initial state is `Pending`
-2. API creates the job in PostgreSQL
-3. API marks the job as `Queued`
-4. API publishes a `ProcessDocumentJobMessage` to RabbitMQ
-5. Worker consumes the message
+2. Application marks the job as Queued `Queued`
+3. Application persists the job and the outbox message atomically in a single transaction.
+4. Background outbox publisher periodically polls for unpublished outbox messages, publishes them to RabbitMQ, and marks them as published.
+5. Worker consumes the message from RabbitMQ.
 6. Worker loads the job from PostgreSQL
 7. Worker marks the job as `Processing`
 8. Worker performs simple text analysis
 9. Worker marks the job as `Completed` or `Failed`
-10. Client checks job status using `GET /api/jobs/{id}` or `GET /api/jobs`
+10. Client retrieves job status using `GET /api/jobs/{id}` or `GET /api/jobs`
 
 ### Current Analysis Output
 
@@ -270,11 +272,13 @@ dotnet run --project src/DocumentProcessing.Worker
 ## Testing
 
 ### Domain tests
-- job creation
+- `DocumentJob` creation with valid input
 - valid transitions
 - invalid transitions
 - guard clauses
 - completion result mapping
+- `OutboxMessage` creation and validation rules
+- outbox publication/error rules
 
 ### API integration tests
 - create job returns accepted response
@@ -319,21 +323,16 @@ E2E tests are excluded from CI and are intended to be run against a locally runn
 
 ## Important Design Notes
 
-### Why jobs are marked queued before publish
+### Outbox Pattern
 
-In the current v1 implementation, a job is marked Queued and persisted before the RabbitMQ message is published.
+Without the outbox pattern, a failure between saving the job and publishing the message could leave a job stranded in Queued state indefinitely.
 
-This avoids a race where the worker could consume the message before the queued state is stored in the database.
+With outbox pattern implemented with unit of work, the job is persisted in the database along with a message in the outbox in one atomic transaction.
+The Outbox Publisher then periodically polls the outbox for unpublished messages and processes them in batches.
 
-### Known limitation
-
-This still leaves a consistency gap:
-- if database save succeeds
-- but message publish fails
-
-then the job may remain Queued without a corresponding broker message.
-
-In a production system, this would typically be addressed with an **outbox pattern**.
+The outbox pattern guarantees at-least-once delivery, however there could be multiple deliveries in case of crash between publishing and marking the message as published.
+The background worker guards against multiple delivery by checking message status before processing, however a more robust solution would be to implement idempotency on the consumer side. This is planned as a future improvement. 
+A partial index on outbox_messages covering only unpublished messages ensures the publisher query stays fast as the table grows. 
 
 ### Auto-migration on startup
 
@@ -346,7 +345,6 @@ This version intentionally keeps scope tight:
 - no real file upload yet
 - no retry endpoint yet
 - no dead-letter queue / retry policy
-- no outbox pattern yet
 - no authentication/authorization yet
 - no pagination/filtering for job listing yet
 - no advanced text analytics yet
@@ -357,7 +355,6 @@ Possible next steps:
 - JWT authentication / authorization
 - retry support for failed jobs
 - real file upload
-- outbox pattern
 - dead-letter queue / retry handling
 - richer keyword analysis and categorisation
 - pagination and filtering for job queries
