@@ -2,7 +2,6 @@ using System.Text.Json;
 using DocumentProcessing.Application.Interfaces;
 using DocumentProcessing.Application.Messaging;
 using DocumentProcessing.Application.Outbox;
-using DocumentProcessing.Domain.Entities;
 using Microsoft.Extensions.Options;
 
 namespace DocumentProcessing.Api.BackgroundServices;
