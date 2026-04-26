@@ -63,4 +63,39 @@ public class OutboxMessageTests
         
         Assert.Throws<ArgumentException>(() => outboxMessage.RecordError(""));
     }
+
+    [Fact]
+    public void IncrementRetryCount_ShouldIncrementCount()
+    {
+        var messageContent = Guid.NewGuid().ToString();
+        var outboxMessage = OutboxMessage.Create(OutboxMessageType, messageContent);
+        
+        outboxMessage.IncrementRetryCount();
+        
+        Assert.Equal(1, outboxMessage.RetryCount);
+    }
+    
+    [Fact]
+    public void RecordError_WhenCalledTwice_ShouldPreserveFirstError()
+    {
+        var messageContent = Guid.NewGuid().ToString();
+        var outboxMessage = OutboxMessage.Create(OutboxMessageType, messageContent);
+        outboxMessage.RecordError("First Error");
+        
+        outboxMessage.RecordError("Second Error");
+        
+        Assert.Equal("First Error", outboxMessage.ErrorMessage);
+    }
+    
+    [Fact]
+    public void IncrementRetryCount_WhenPublished_ShouldThrow()
+    {
+        var messageContent = Guid.NewGuid().ToString();
+        var outboxMessage = OutboxMessage.Create(OutboxMessageType, messageContent);
+        outboxMessage.MarkPublished();
+
+        Assert.Throws<InvalidOperationException>(outboxMessage.IncrementRetryCount);
+    }
+    
+    
 }
