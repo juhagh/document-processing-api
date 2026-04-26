@@ -23,6 +23,7 @@ public class OutboxMessage
     public DateTime CreatedAtUtc { get; private set; }
     public DateTime? PublishedOnUtc { get; private set; }
     public string? ErrorMessage { get; private set; }
+    public int RetryCount { get; private set; }
 
     public static OutboxMessage Create(string type, string content)
     {
@@ -44,6 +45,15 @@ public class OutboxMessage
         if (PublishedOnUtc != null)
             throw new InvalidOperationException("Cannot record error after message is published.");
         
-        ErrorMessage = error;
+        if (ErrorMessage == null)
+            ErrorMessage = error;
+    }
+
+    public void IncrementRetryCount()
+    {
+        if (PublishedOnUtc != null)
+            throw new InvalidOperationException("Published message should not be retried");
+
+        RetryCount += 1;
     }
 }
