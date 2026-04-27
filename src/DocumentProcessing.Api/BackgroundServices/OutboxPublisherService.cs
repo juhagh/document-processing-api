@@ -52,7 +52,19 @@ public class OutboxPublisherService : BackgroundService
                             {
                                 message.RecordError("Serialized Document Job Message is null.");
                                 _logger.LogError("Failed to deserialize message {id}", message.Id);
-                                continue;
+                                break;
+                            }
+
+                            if (message.RetryCount >= _options.MaxRetries)
+                            {
+                                var job = await repo.JobRepository.GetTrackedByIdAsync(jobMessage.JobId, stoppingToken);
+                                if (job != null)
+                                    job.MarkFailed("Max Retries exceeded.");
+                                message.AbandonMessage();
+                                message.RecordError("Max retries exceeded.");
+                                
+                                _logger.LogError("Max Retry Count exceeded for outbox message with ID: {id}", message.Id);
+                                break;
                             }
 
                             await publisher.PublishAsync(jobMessage, stoppingToken);
@@ -69,6 +81,7 @@ public class OutboxPublisherService : BackgroundService
                 catch (Exception ex)
                 {
                     message.RecordError(ex.Message);
+                    message.IncrementRetryCount();
                     _logger.LogError(ex, "Error processing outbox message {id}", message.Id);
                 }
             }
