@@ -22,6 +22,7 @@ public class OutboxMessage
     public string Content { get; private set; } = null!;
     public DateTime CreatedAtUtc { get; private set; }
     public DateTime? PublishedOnUtc { get; private set; }
+    public DateTime? AbandonedAtUtc { get; private set; }
     public string? ErrorMessage { get; private set; }
     public int RetryCount { get; private set; }
 
@@ -55,5 +56,16 @@ public class OutboxMessage
             throw new InvalidOperationException("Published message should not be retried");
 
         RetryCount += 1;
+    }
+    
+    public void AbandonMessage()
+    {
+        if (PublishedOnUtc != null)
+            throw new InvalidOperationException("Can not abandon already published message");
+
+        if (AbandonedAtUtc != null)
+            throw new InvalidOperationException("Can not abandon already abandoned message");
+
+        AbandonedAtUtc = DateTime.UtcNow;    
     }
 }

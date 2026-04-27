@@ -39,10 +39,4 @@ public class JobRepository : IJobRepository
         return await _context.DocumentJobs
             .FirstOrDefaultAsync(j => j.Id == id, cancellationToken);
     }
-
-    public async Task SaveChangesAsync(CancellationToken cancellationToken = default)
-    {
-        await _context.SaveChangesAsync(cancellationToken);
-    }
-
 }

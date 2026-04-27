@@ -7,4 +7,6 @@ public class OutboxOptions
     
     // Number of messages to process in a single batch
     public int BatchSize { get; set; } = 5;
+
+    public int MaxRetries { get; set; } = 3;
 }

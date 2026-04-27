@@ -19,19 +19,14 @@ public class OutboxRepository : IOutboxRepository
         await _context.OutboxMessages.AddAsync(message, cancellationToken);
     }
     
-    public async Task<IReadOnlyList<OutboxMessage>> GetUnpublishedAsync(int batchSize,
+    public async Task<IReadOnlyList<OutboxMessage>> GetUnpublishedAsync(int batchSize, 
         CancellationToken cancellationToken = default)
     {
         return await _context.OutboxMessages
             .Where(o => o.PublishedOnUtc == null)
-            .Where(o => o.ErrorMessage == null)
+            .Where(o => o.AbandonedAtUtc == null)
             .OrderBy(o => o.CreatedAtUtc)
             .Take(batchSize)
             .ToListAsync(cancellationToken);
-    }
-    
-    public async Task SaveChangesAsync(CancellationToken cancellationToken = default)
-    {
-        await _context.SaveChangesAsync(cancellationToken);
     }
 }

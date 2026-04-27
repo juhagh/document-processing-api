@@ -26,7 +26,7 @@ public class OutboxMessageConfiguration : IEntityTypeConfiguration<OutboxMessage
 
         // 4. Indexes
         builder.HasIndex(o => o.CreatedAtUtc)
-            .HasFilter("\"PublishedOnUtc\" IS NULL AND \"ErrorMessage\" IS NULL")
+            .HasFilter("\"PublishedOnUtc\" IS NULL AND \"AbandonedAtUtc\" IS NULL")
             .HasDatabaseName("idx_outbox_messages_unpublished_createdat");
     }
     
