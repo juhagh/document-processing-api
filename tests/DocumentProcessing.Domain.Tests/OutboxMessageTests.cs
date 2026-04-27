@@ -97,5 +97,35 @@ public class OutboxMessageTests
         Assert.Throws<InvalidOperationException>(outboxMessage.IncrementRetryCount);
     }
     
+    [Fact]
+    public void AbandonMessage_ShouldSetAbandonMessageAtUtc()
+    {
+        var messageContent = Guid.NewGuid().ToString();
+        var outboxMessage = OutboxMessage.Create(OutboxMessageType, messageContent);
+        
+        outboxMessage.AbandonMessage();
+        
+        Assert.NotNull(outboxMessage.AbandonedAtUtc);
+    }
     
+    [Fact]
+    public void AbandonMessage_WhenPublished_ShouldThrow()
+    {
+        var messageContent = Guid.NewGuid().ToString();
+        var outboxMessage = OutboxMessage.Create(OutboxMessageType, messageContent);
+        outboxMessage.MarkPublished();
+
+        Assert.Throws<InvalidOperationException>(outboxMessage.AbandonMessage);
+        Assert.Null(outboxMessage.AbandonedAtUtc);
+    }
+        
+    [Fact]
+    public void AbandonMessage_WhenAbandoned_ShouldThrow()
+    {
+        var messageContent = Guid.NewGuid().ToString();
+        var outboxMessage = OutboxMessage.Create(OutboxMessageType, messageContent);
+        outboxMessage.AbandonMessage();
+
+        Assert.Throws<InvalidOperationException>(outboxMessage.AbandonMessage);
+    }
 }
