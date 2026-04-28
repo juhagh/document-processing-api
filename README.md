@@ -40,6 +40,8 @@ This project is designed to show practical backend skills that map to real syste
 - fully containerised local development with Docker Compose
 - integration, domain, and worker unit testing
 - GitHub Actions CI
+- dead-letter queue handling
+- consumer-side retry tracking
 
 ## Current Tech Stack
 
@@ -181,12 +183,12 @@ Returns jobs ordered by SubmittedAtUtc descending.
 ### Current Processing Flow
 
 1. Client submits a document job to `POST /api/jobs`, job initial state is `Pending`
-2. Application marks the job as Queued `Queued`
+2. Application marks the job as `Queued`
 3. Application persists the job and the outbox message atomically in a single transaction.
 4. Background outbox publisher periodically polls for unpublished outbox messages, publishes them to RabbitMQ, and marks them as published.
 5. Worker consumes the message from RabbitMQ.
 6. Worker loads the job from PostgreSQL
-7. Worker marks the job as `Processing`
+7. Worker marks the job as `Processing` (Note: In current version, this state change is not visible to client in case of retry scenario)
 8. Worker performs simple text analysis
 9. Worker marks the job as `Completed` or `Failed`
 10. Client retrieves job status using `GET /api/jobs/{id}` or `GET /api/jobs`
@@ -294,7 +296,7 @@ dotnet run --project src/DocumentProcessing.Worker
 
 ### E2E tests
 - full job lifecycle from submission to completion
-- full job lifecycle from submission to failure
+- full job lifecycle from submission to failure *(skipped — see Known Limitation: Consumer Retry Queue Pattern)*
 
 > E2E tests require the full stack to be running via `docker compose up`.
 
@@ -334,6 +336,76 @@ The outbox pattern guarantees at-least-once delivery, however there could be mul
 The background worker guards against multiple delivery by checking message status before processing, however a more robust solution would be to implement idempotency on the consumer side. This is planned as a future improvement. 
 A partial index on outbox_messages covering only unpublished messages ensures the publisher query stays fast as the table grows. 
 
+### Dead-Letter Queue
+
+A Dead Letter Exchange (DLX) and Dead Letter Queue (DLQ) are implemented for handling messages that cannot be processed safely.
+
+The main queue, `document-processing.jobs`, is configured with a dead-letter exchange:
+
+- DLX: `document-processing.dlx`
+- DLQ: `document-processing.jobs.dlq`
+- Dead-letter routing key: `document-processing-key`
+
+When the worker determines that a message should not be retried, it negatively acknowledges the message with `requeue: false`. RabbitMQ then dead-letters the message to `document-processing.dlx`, which routes it to `document-processing.jobs.dlq` using the configured binding.
+The DLX, DLQ, and bindings are declared in `rabbitmq/definitions.json`.
+
+#### Messages are dead-lettered for cases such as:
+
+- Invalid or empty `ProcessDocumentJobMessage`
+- Malformed `x-death` header
+- Non-existent `DocumentJob`
+- `DocumentJob` is not in the expected `Queued` state
+- Maximum retry count exceeded, once broker-level retry/dead-letter tracking is fully implemented
+
+```text
+Producer / API
+    │
+    │ publish job message
+    ▼
+document-processing.jobs
+    │
+    │ consumed by Worker
+    ▼
+DocumentJobConsumer
+    │
+    ├── success
+    │   └── message is acknowledged and removed from queue
+    │       BasicAckAsync
+    │
+    ├── transient failure
+    │   └── message is negatively acknowledged and requeued
+    │       BasicNackAsync(requeue: true)
+    │
+    └── non-retryable failure / retry limit exceeded
+        │
+        │ message is negatively acknowledged without requeue
+        │ BasicNackAsync(requeue: false)
+        │
+        │ RabbitMQ dead-letters the message using:
+        │   exchange:    document-processing.dlx
+        │   routing key: document-processing-key
+        ▼
+document-processing.dlx
+    │
+    │ direct exchange binding:
+    │   routing key: document-processing-key
+    ▼
+document-processing.jobs.dlq
+```
+
+### Known Limitation: Consumer Retry Queue Pattern
+
+Currently, transient processing failures are handled with `BasicNackAsync(requeue: true)`, which returns the message immediately to the main queue.
+This is simple, but it has two drawbacks:
+
+- a repeatedly failing message may be retried immediately and consume worker capacity
+- because the message is requeued rather than dead-lettered, RabbitMQ’s x-death header is not incremented for those retry attempts.
+
+The worker already contains early support for reading RabbitMQ’s x-death header, but the current retry behaviour does not yet make full use of it because failed messages are requeued directly.
+
+A more robust solution would use a dedicated retry exchange and retry queue with a TTL. Failed messages would be dead-lettered into the retry queue, wait for the TTL to expire, and then be routed back to the main queue. This would provide delayed retries and better broker-level retry tracking.
+This is planned as a future improvement.
+
 ### Auto-migration on startup
 
 The API automatically applies pending EF Core migrations on startup. This ensures the database schema is always up to date when running via Docker Compose without any manual steps.
@@ -344,7 +416,6 @@ This version intentionally keeps scope tight:
 - text input only
 - no real file upload yet
 - no retry endpoint yet
-- no dead-letter queue / retry policy
 - no authentication/authorization yet
 - no pagination/filtering for job listing yet
 - no advanced text analytics yet
@@ -355,10 +426,10 @@ Possible next steps:
 - JWT authentication / authorization
 - retry support for failed jobs
 - real file upload
-- dead-letter queue / retry handling
 - richer keyword analysis and categorisation
 - pagination and filtering for job queries
 - React frontend for job submission and status tracking
+- dedicated retry exchange and queue with a TTL
 
 ## Why This Project Exists
 
