@@ -64,8 +64,20 @@ public class DocumentJobConsumer : BackgroundService
             out var malformedXDeathHeader);
         
         var body = ea.Body.ToArray();
-        var message = JsonSerializer.Deserialize<ProcessDocumentJobMessage>(body);
         
+        ProcessDocumentJobMessage? message;
+
+        try
+        {
+            message = JsonSerializer.Deserialize<ProcessDocumentJobMessage>(body);
+        }
+        catch (JsonException ex)
+        {
+            _logger.LogWarning(ex, "Received malformed ProcessDocumentJobMessage JSON.");
+            await channel.BasicNackAsync(ea.DeliveryTag, multiple: false, requeue: false, cancellationToken);
+            return;
+        }
+
         if (message is null)
         {
             _logger.LogWarning("Received invalid or empty ProcessDocumentJobMessage.");
