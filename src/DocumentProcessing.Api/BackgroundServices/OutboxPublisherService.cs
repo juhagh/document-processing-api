@@ -59,7 +59,13 @@ public class OutboxPublisherService : BackgroundService
                             {
                                 var job = await repo.JobRepository.GetTrackedByIdAsync(jobMessage.JobId, stoppingToken);
                                 if (job != null)
+                                {
+                                    // Queued -> Processing -> Failed required since no intermediate commit exists in DocumentJobConsumer.
+                                    // See known limitation: retry queue pattern not yet implemented.
+                                    job.MarkQueued();
                                     job.MarkFailed("Max Retries exceeded.");
+                                }
+                                    
                                 message.AbandonMessage();
                                 message.RecordError("Max retries exceeded.");
                                 

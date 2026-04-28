@@ -11,4 +11,5 @@ public class RabbitMqOptions
     public bool AutomaticRecoveryEnabled { get; set; } = true;
     public int RequestedHeartbeat { get; set; } = 30;
     public string QueueName { get; set; } = string.Empty;
+    public int MaxRetries { get; set; } = 3;
 }

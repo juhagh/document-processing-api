@@ -29,6 +29,9 @@
       interval: 5s
       timeout: 5s
       retries: 5
+    volumes:
+      - ./rabbitmq/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf
+      - ./rabbitmq/definitions.json:/etc/rabbitmq/definitions.json
 
   api:
     build:

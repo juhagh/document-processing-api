@@ -1,7 +1,6 @@
 using System.Text.Json;
 using DocumentProcessing.Application.Interfaces;
 using DocumentProcessing.Application.Messaging;
-using DocumentProcessing.Domain.Entities;
 using DocumentProcessing.Domain.Enums;
 using DocumentProcessing.Infrastructure.Messaging;
 using DocumentProcessing.Worker.Services;
@@ -38,14 +37,6 @@ public class DocumentJobConsumer : BackgroundService
         await using var connection = await _connectionFactory.CreateConnectionAsync(stoppingToken);
         await using var channel = await connection.CreateChannelAsync(cancellationToken: stoppingToken);
 
-        await channel.QueueDeclareAsync(
-            queue: _options.QueueName,
-            durable: true,
-            exclusive: false,
-            autoDelete: false,
-            arguments: null,
-            cancellationToken: stoppingToken);
-
         var consumer = new AsyncEventingBasicConsumer(channel);
 
         consumer.ReceivedAsync += async (_, ea) =>
@@ -67,13 +58,29 @@ public class DocumentJobConsumer : BackgroundService
         BasicDeliverEventArgs ea,
         CancellationToken cancellationToken)
     {
+        var parsed = TryGetDeathCount(
+            ea.BasicProperties,
+            out var retryCount,
+            out var malformedXDeathHeader);
+        
         var body = ea.Body.ToArray();
         var message = JsonSerializer.Deserialize<ProcessDocumentJobMessage>(body);
         
         if (message is null)
         {
             _logger.LogWarning("Received invalid or empty ProcessDocumentJobMessage.");
-            await channel.BasicAckAsync(ea.DeliveryTag, multiple: false, cancellationToken: cancellationToken);
+            await channel.BasicNackAsync(ea.DeliveryTag, multiple: false, requeue: false, cancellationToken);
+            return;
+        }
+        
+        if (!parsed && malformedXDeathHeader)
+        {
+            // Treat as poison message.
+            // Do not requeue indefinitely.
+            _logger.LogWarning("Malformed x-death header detected. Nack message without requeue. JobId: {JobId}.",
+                message.JobId);
+            
+            await channel.BasicNackAsync(ea.DeliveryTag, multiple: false, requeue: false, cancellationToken);
             return;
         }
         
@@ -83,30 +90,41 @@ public class DocumentJobConsumer : BackgroundService
         
         var repo = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
         
-        DocumentJob? job = null;
-        
         try
         {
-            job = await repo.JobRepository.GetTrackedByIdAsync(message.JobId, cancellationToken);
+            var job = await repo.JobRepository.GetTrackedByIdAsync(message.JobId, cancellationToken);
             if (job is null)
             {
                 _logger.LogWarning("Job {JobId} was not found.", message.JobId);
-                await channel.BasicAckAsync(ea.DeliveryTag, multiple: false, cancellationToken: cancellationToken);
+                await channel.BasicNackAsync(ea.DeliveryTag, multiple: false, requeue: false, cancellationToken);
                 return;
             }
-
-            if (job.Status != JobStatus.Queued)
+            
+            if (retryCount >= _options.MaxRetries)
+            {
+                // Max retry attempts reached.
+                _logger.LogWarning("MaxRetries exceeded. Nack message without requeue. JobId: {JobId}.", message.JobId);
+                // Queued -> Processing -> Failed required since no intermediate commit exists.
+                // See known limitation: retry queue pattern not yet implemented.
+                job.MarkProcessing();
+                job.MarkFailed("MaxRetries exceeded.");
+                await repo.CommitAsync(cancellationToken);
+                await channel.BasicNackAsync(ea.DeliveryTag, multiple: false, requeue: false, cancellationToken);
+                return;
+            }
+            
+            if (job.Status != JobStatus.Queued) 
             {
                 _logger.LogWarning(
-                    "Job {JobId} was in status {Status}, expected Queued. Message will be acknowledged.",
+                    "Job {JobId} was in status {Status}, expected Queued. Nack message without requeue.",
                     job.Id,
                     job.Status);
-                await channel.BasicAckAsync(ea.DeliveryTag, multiple: false, cancellationToken: cancellationToken);
+                await channel.BasicNackAsync(ea.DeliveryTag, multiple: false, requeue: false, cancellationToken);
                 return;
             }
             
             job.MarkProcessing();
-            await repo.CommitAsync(cancellationToken);
+            // Commit once RabbitMQ retry exchange/queue are implemented
 
             _logger.LogInformation("Started processing job {JobId}.", job.Id);
             
@@ -122,14 +140,51 @@ public class DocumentJobConsumer : BackgroundService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to process job {JobId}.", message.JobId);
-
-            if (job is not null && job.Status == JobStatus.Processing)
-            {
-                job.MarkFailed(ex.Message);
-                await repo.CommitAsync(cancellationToken);
-            }
-
-            await channel.BasicAckAsync(ea.DeliveryTag, multiple: false, cancellationToken: cancellationToken);
+            await channel.BasicNackAsync(ea.DeliveryTag, multiple: false, requeue: true, cancellationToken);
         }
+    }
+    
+    private static bool TryGetDeathCount(
+        IReadOnlyBasicProperties properties,
+        out long deathCount,
+        out bool malformedXDeathHeader)
+    {
+        deathCount = 0;
+        malformedXDeathHeader = false;
+
+        if (properties.Headers is not { } headers ||
+            !headers.TryGetValue("x-death", out var rawXDeath))
+        {
+            return true; // no retry history yet
+        }
+
+        if (rawXDeath is not IList<object> xDeathList ||
+            xDeathList.Count == 0 ||
+            xDeathList[0] is not IDictionary<string, object> firstEntry ||
+            !firstEntry.TryGetValue("count", out var rawCount))
+        {
+            // Something wrong with headers
+            malformedXDeathHeader = true;
+            return false; 
+        }
+
+        deathCount = rawCount switch
+        {
+            long value => value,
+            int value => value,
+            short value => value,
+            byte value => value,
+            _ => -1
+        };
+
+        if (deathCount < 0)
+        {
+            // Something wrong with headers
+            malformedXDeathHeader = true;
+            deathCount = 0;
+            return false;
+        }
+
+        return true;
     }
 }
