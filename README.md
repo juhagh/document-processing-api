@@ -247,6 +247,10 @@ curl http://localhost:8080/api/jobs/{id}
 
 Available at `http://localhost:15672` using the credentials configured in `docker-compose.yml`.
 
+### API Documentation
+
+Interactive API documentation is available via Scalar at `http://localhost:8080/scalar/v1` when running locally.
+
 ### Running locally without Docker (development)
 
 If you prefer to run the API and worker directly for faster iteration:
@@ -288,6 +292,10 @@ dotnet run --project src/DocumentProcessing.Worker
 - get job by id returns the persisted job
 - get job by id returns 404 when missing
 - list jobs returns jobs ordered by submission time
+
+> API integration tests require a running PostgreSQL instance.  
+> Start infrastructure with `docker compose up -d postgres rabbitmq` before running the full test suite locally.  
+> Domain and worker unit tests run without any infrastructure.
 
 ### Worker unit tests
 - document analysis returns expected counts for single-line input
