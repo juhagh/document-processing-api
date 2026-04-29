@@ -111,6 +111,13 @@ public class DocumentJobConsumer : BackgroundService
                 await channel.BasicNackAsync(ea.DeliveryTag, multiple: false, requeue: false, cancellationToken);
                 return;
             }
+
+            if (job.Status is JobStatus.Completed or JobStatus.Failed)
+            {
+                _logger.LogInformation("DocumentJob {JobID} already in terminal state {JobStatus}, ignoring request", job.Id,  job.Status);
+                await channel.BasicAckAsync(ea.DeliveryTag, multiple: false, cancellationToken: cancellationToken);
+                return;
+            }
             
             if (retryCount >= _options.MaxRetries)
             {
