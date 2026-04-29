@@ -4,6 +4,7 @@ using DocumentProcessing.Application.DependencyInjection;
 using DocumentProcessing.Infrastructure.DependencyInjection;
 using DocumentProcessing.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -33,6 +34,7 @@ var app = builder.Build();
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
+    app.MapScalarApiReference();
 }
 
 // Auto-apply migrations on startup
