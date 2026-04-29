@@ -21,9 +21,10 @@ This portfolio project is built to demonstrate employable .NET backend skills be
 - fully containerised application and infrastructure
 - layered architecture
 - automated testing
-- GitHub Actions CI
+- GitHub Actions CI 
+- idempotent consumer design
 
-In the current version, the API accepts **text input** rather than real file uploads. A client submits a document-processing job, the API stores the job and outbox message, and marks the job as queued.  Publisher periodically polls outbox for unpublished messages, processes them in batches and publishes to RabbitMQ. A worker then processes the job asynchronously. The client can then query job status and results later.
+In the current version, the API accepts **text input** rather than real file uploads. A client submits a document-processing job, the API stores the job and outbox message, and marks the job as queued. The publisher periodically polls the outbox for unpublished messages, processes them in batches, and publishes them to RabbitMQ. A worker then processes the job asynchronously. The client can then query job status and results later.
 
 ## What This Project Demonstrates
 
@@ -42,8 +43,9 @@ This project is designed to show practical backend skills that map to real syste
 - GitHub Actions CI
 - dead-letter queue handling
 - consumer-side retry tracking
+- idempotent consumer
 
-## Current Tech Stack
+## Tech Stack
 
 - .NET 10
 - ASP.NET Core Web API
@@ -93,18 +95,20 @@ tests/
 - **DocumentProcessing.Worker**
   Background consumer that reads RabbitMQ messages, loads jobs from the database, performs analysis, and updates job state.
 
-## Current Job Lifecycle
+## Job Lifecycle
 
 The core aggregate is `DocumentJob`.
 
 A job moves through these states:
+
 - Pending
 - Queued
 - Processing
 - Completed
 - Failed
 
-Current transition rules:
+transition rules:
+
 - Pending -> Queued
 - Queued -> Processing
 - Processing -> Completed
@@ -112,7 +116,7 @@ Current transition rules:
 
 For v1, Failed is treated as a terminal state.
 
-## Current API Endpoints
+## API Endpoints
 
 ### Create a job
 
@@ -180,7 +184,7 @@ Returns jobs ordered by SubmittedAtUtc descending.
 }
 ```
 
-### Current Processing Flow
+### Processing Flow
 
 1. Client submits a document job to `POST /api/jobs`, job initial state is `Pending`
 2. Application marks the job as `Queued`
@@ -188,12 +192,12 @@ Returns jobs ordered by SubmittedAtUtc descending.
 4. Background outbox publisher periodically polls for unpublished outbox messages, publishes them to RabbitMQ, and marks them as published.
 5. Worker consumes the message from RabbitMQ.
 6. Worker loads the job from PostgreSQL
-7. Worker marks the job as `Processing` (Note: In current version, this state change is not visible to client in case of retry scenario)
+7. Worker marks the job as `Processing`. In the current version, this intermediate state may not be visible to the client during fast processing or retry scenarios.
 8. Worker performs simple text analysis
 9. Worker marks the job as `Completed` or `Failed`
 10. Client retrieves job status using `GET /api/jobs/{id}` or `GET /api/jobs`
 
-### Current Analysis Output
+### Analysis Output
 
 **The worker currently produces:**
 - word count
@@ -204,9 +208,9 @@ Returns jobs ordered by SubmittedAtUtc descending.
 - truncated summary
 
 **Notes**
-- line counting ignores trailing newline characters
-- keywordHits is currently a placeholder implementation
-- category is currently a simple default value
+- Line counting ignores trailing newline characters.
+- `keywordHits` is currently a placeholder implementation.
+- `category` is currently a simple default value.
 
 ## Running Locally
 
@@ -283,8 +287,8 @@ dotnet run --project src/DocumentProcessing.Worker
 - outbox publication/error rules
 
 ### API integration tests
-- create job returns accepted response
-- get job by id returns persisted job
+- create job returns an accepted response
+- get job by id returns the persisted job
 - get job by id returns 404 when missing
 - list jobs returns jobs ordered by submission time
 
@@ -332,9 +336,16 @@ Without the outbox pattern, a failure between saving the job and publishing the 
 With outbox pattern implemented with unit of work, the job is persisted in the database along with a message in the outbox in one atomic transaction.
 The Outbox Publisher then periodically polls the outbox for unpublished messages and processes them in batches.
 
-The outbox pattern guarantees at-least-once delivery, however there could be multiple deliveries in case of crash between publishing and marking the message as published.
-The background worker guards against multiple delivery by checking message status before processing, however a more robust solution would be to implement idempotency on the consumer side. This is planned as a future improvement. 
-A partial index on outbox_messages covering only unpublished messages ensures the publisher query stays fast as the table grows. 
+A partial index on outbox_messages covering only unpublished messages ensures the publisher query stays fast as the table grows.
+
+
+### Message delivery semantics
+
+This project uses the **outbox pattern** to provide at-least-once message delivery between the API and worker process. When a document job is created, the job state change and the corresponding outbox message are persisted in the same database transaction. A separate publisher then reads unpublished outbox messages and publishes them to RabbitMQ.
+
+Because at-least-once delivery can result in the same message being delivered more than once, the worker is designed as an **idempotent consumer**. Before processing a message, the worker loads the current job state and only performs work when the job is in a valid processable state. Messages in Completed or Failed states are acknowledged without reprocessing the job.
+
+This project intentionally does **not** attempt to provide at-most-once or exactly-once delivery. Implementing them would require additional distributed coordination that is outside the scope of this portfolio project.
 
 ### Dead-Letter Queue
 
@@ -354,8 +365,7 @@ The DLX, DLQ, and bindings are declared in `rabbitmq/definitions.json`.
 - Invalid or empty `ProcessDocumentJobMessage`
 - Malformed `x-death` header
 - Non-existent `DocumentJob`
-- `DocumentJob` is not in the expected `Queued` state
-- Maximum retry count exceeded, once broker-level retry/dead-letter tracking is fully implemented
+- `DocumentJob` is in a state that cannot be safely processed or acknowledged as a duplicate
 
 ```text
 Producer / API
@@ -430,6 +440,7 @@ Possible next steps:
 - pagination and filtering for job queries
 - React frontend for job submission and status tracking
 - dedicated retry exchange and queue with a TTL
+- dead-lettering messages that exceed the maximum retry count
 
 ## Why This Project Exists
 
