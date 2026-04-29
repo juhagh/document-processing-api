@@ -100,6 +100,16 @@ public class DocumentJob
         ErrorMessage = errorMessage;
         Touch();
     }
+    
+    public void AbandonJob(string errorMessage)
+    {
+        if (Status != JobStatus.Queued)
+            throw new InvalidOperationException($"Cannot mark job dispatch failed when status is {Status}.");
+
+        Status = JobStatus.Failed;
+        ErrorMessage = errorMessage;
+        UpdatedAtUtc = DateTime.UtcNow;
+    }
 
     private void Touch() => UpdatedAtUtc = DateTime.UtcNow;
 }

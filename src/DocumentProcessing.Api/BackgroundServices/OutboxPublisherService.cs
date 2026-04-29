@@ -2,6 +2,7 @@ using System.Text.Json;
 using DocumentProcessing.Application.Interfaces;
 using DocumentProcessing.Application.Messaging;
 using DocumentProcessing.Application.Outbox;
+using DocumentProcessing.Domain.Enums;
 using Microsoft.Extensions.Options;
 
 namespace DocumentProcessing.Api.BackgroundServices;
@@ -58,18 +59,24 @@ public class OutboxPublisherService : BackgroundService
                             if (message.RetryCount >= _options.MaxRetries)
                             {
                                 var job = await repo.JobRepository.GetTrackedByIdAsync(jobMessage.JobId, stoppingToken);
-                                if (job != null)
+                                if (job is { Status: JobStatus.Queued })
                                 {
-                                    // Queued -> Processing -> Failed required since no intermediate commit exists in DocumentJobConsumer.
-                                    // See known limitation: retry queue pattern not yet implemented.
-                                    job.MarkQueued();
-                                    job.MarkFailed("Max Retries exceeded.");
+                                    job.AbandonJob("Message could not be published after maximum retry attempts.");
+                                    _logger.LogWarning("Outbox message {id} exceeded max retries. Job {jobId} has been abandoned.", 
+                                        message.Id, jobMessage.JobId);
+                                }
+                                else
+                                {
+                                    _logger.LogError(
+                                        "Outbox message {id} exceeded max retries, but related job {jobId} was not in Queued state. Current state: {status}",
+                                        message.Id,
+                                        jobMessage.JobId,
+                                        job?.Status.ToString() ?? "not found");
                                 }
                                     
                                 message.AbandonMessage();
                                 message.RecordError("Max retries exceeded.");
                                 
-                                _logger.LogError("Max Retry Count exceeded for outbox message with ID: {id}", message.Id);
                                 break;
                             }
 
