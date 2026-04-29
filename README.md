@@ -99,22 +99,19 @@ tests/
 
 The core aggregate is `DocumentJob`.
 
-A job moves through these states:
+A job starts in `Pending`, is moved to `Queued` when the job and outbox message are persisted, then moves to `Processing` when the worker begins analysis. From `Processing`, the job can become either `Completed` or `Failed`.
 
-- Pending
-- Queued
-- Processing
-- Completed
-- Failed
+There is also a dispatch-failure path from `Queued` to `Failed`. This is used when the outbox publisher cannot publish the job message to RabbitMQ after the maximum retry count is exceeded. In that case, the job failed before worker processing began.
 
-transition rules:
+Transition rules:
 
-- Pending -> Queued
-- Queued -> Processing
-- Processing -> Completed
-- Processing -> Failed
+- `Pending` -> `Queued`
+- `Queued` -> `Processing`
+- `Processing` -> `Completed`
+- `Processing` -> `Failed`
+- `Queued` -> `Failed` for outbox dispatch failure
 
-For v1, Failed is treated as a terminal state.
+For v1, `Completed` and `Failed` are treated as terminal states.
 
 ## API Endpoints
 
